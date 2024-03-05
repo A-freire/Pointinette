@@ -13,7 +13,9 @@ class Hours42ViewModel: ObservableObject {
 
     @Published var periods: [Period]
     @Published var pressed: Bool = true
+    @Published var refresh: Bool = UserDefaults.standard.bool(forKey: "refresh")
     @Published var timeSince:String =  ""
+
     init(context: NSManagedObjectContext, startPeriod: Date? = nil) {
         self.moc = context
 
@@ -63,6 +65,13 @@ class Hours42ViewModel: ObservableObject {
     func getPeriodEnd(period: Period) -> String {
         return period.end?.formatted() ?? "Not defined"
     }
+    func getTimePeriod(period: Period) -> String {
+        guard period.end != nil else { return "Ongoing session" }
+        let end = period.end ?? Date()
+        let start = period.start ?? Date()
+        let total: TimeInterval = end.timeIntervalSince(start)
+        return "\(Int(total) / 3600) heures \(Int(total) % 3600 / 60) minutes"
+    }
     func getTimeThisMount() -> String {
         var total: TimeInterval = 0
         let calendar = Calendar.current
@@ -81,5 +90,65 @@ class Hours42ViewModel: ObservableObject {
         let hours = Int(total) / 3600
         let minutes = Int(total) % 3600 / 60
         return "\(hours) heures \(minutes) minutes"
+    }
+    func getRefresh() -> Bool {return refresh}
+    func setRefresh() {
+        refresh.toggle()
+        UserDefaults.standard.set(refresh, forKey: "refresh")
+    }
+//    func changeTime(oldPeriod: Period, from: Date, to: Date) {
+//        let period = Period(context: moc)
+//        period.id = UUID()
+//        period.start = from
+//        period.end = to
+//        periods.replaceAllOccurrences(of:oldPeriod, with: period)
+//        try? moc.save()
+//    }
+    func changeTime(oldPeriod: Period, from: Date, to: Date) {
+        // Trouvez l'objet Period existant que vous souhaitez modifier.
+        // Supposons que `oldPeriod` est déjà cet objet et que vous n'avez pas besoin de le rechercher à nouveau.
+        oldPeriod.start = from
+        oldPeriod.end = to
+
+        // Pas besoin de créer un nouveau Period ou de remplacer dans le tableau,
+        // car vous avez modifié l'objet existant directement.
+
+        do {
+            try moc.save() // Sauvegardez les changements dans le contexte.
+        } catch {
+            let nsError = error as NSError
+            fatalError("Erreur non résolue \(nsError), \(nsError.userInfo)")
+        }
+
+        // Optionnel : Mettez à jour le tableau periods si nécessaire.
+        // Cela peut dépendre de la façon dont vous utilisez ce tableau dans votre UI.
+        // Si les objets Period sont affichés à partir de ce tableau, vous voudrez peut-être le mettre à jour.
+        // Par exemple, si vous avez besoin de trier à nouveau le tableau après la modification.
+        if let index = periods.firstIndex(of: oldPeriod) {
+            periods[index] = oldPeriod
+        }
+    }
+
+    func deletePeriod(period:Period) {
+        moc.delete(period)
+        if let index = periods.firstIndex(of: period) {
+            periods.remove(at: index)
+        }
+        do {
+            try moc.save()
+        } catch {
+            let nsError = error as NSError
+            fatalError("Erreur non résolue \(nsError), \(nsError.userInfo)")
+        }
+    }
+}
+
+extension Array where Element: Equatable {
+    mutating func replaceAllOccurrences(of oldValue: Element, with newValue: Element) {
+        for i in indices {
+            if self[i] == oldValue {
+                self[i] = newValue
+            }
+        }
     }
 }
